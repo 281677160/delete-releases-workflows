@@ -331,12 +331,6 @@ get_workflows_list() {
             tail -n +${val} ${all_workflows_list} > xin_workflows_list
             cat xin_workflows_list > ${all_workflows_list}
             echo -e "${INFO} (2.3.2) The keep workflows runs list is generated successfully."
-
-            # Remove duplicate lines
-            [[ -s "${keep_workflows_list}" ]] && {
-                awk '!a[$0]++' ${keep_workflows_list} >${tmp_josn_file} && mv -f ${tmp_josn_file} ${keep_workflows_list}
-            }
-            [[ "${out_log}" == "true" ]] && echo -e "${INFO} (2.3.2) Keep workflows list:\n$(cat ${keep_workflows_list})"
         fi
     else
         echo -e "${TIPS} (2.3.3) The workflows runs list is empty. skip."
