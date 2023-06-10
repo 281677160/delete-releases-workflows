@@ -278,10 +278,16 @@ get_workflows_list() {
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${gh_token}" \
         https://api.github.com/repos/${repo}/actions/runs |
-        jq -c '.workflow_runs[] | select(.status != "in_progress") | {date: .updated_at, id: .id, name: .name}' \
+        jq -c '.workflow_runs[] | select(.status != "in_progress") |  {path: .path, id: .id, run_number: .run_number}' \
             >${all_workflows_list}
-    [[ "${?}" -eq "0" && -s "${all_workflows_list}" ]] || error_msg "(2.1.1) The api.github.com for workflows query failed."
-    echo -e "${INFO} (2.1.1) The api.github.com for workflows request successfully."
+    if [[ -n "$(grep "run_number" "${all_workflows_list}")" ]]; then
+        cat "${all_workflows_list}" |grep "compile.yml" > josn_apix
+        cat "${all_workflows_list}" |grep ".yml" |grep -v "compile.yml" >> josn_apix
+        cat josn_apix > ${all_workflows_list}
+        echo -e "${INFO} (2.1.1) The api.github.com for workflows request successfully."
+    else
+        error_msg "(2.1.1) The api.github.com for workflows query failed."
+    fi
     [[ "${out_log}" == "true" ]] && echo -e "${INFO} (2.1.1) All workflows runs list:\n$(cat ${all_workflows_list})"
 
     # The workflows containing keywords that need to be keep
@@ -291,7 +297,7 @@ get_workflows_list() {
         # Match the list of workflows that meet the keywords
         echo -e "${INFO} (2.2.1) Filter Workflows runs keywords: [ $(echo ${workflows_keep_keyword[*]} | xargs) ]"
         for ((i = 0; i < ${#workflows_keep_keyword[*]}; i++)); do
-            cat ${all_workflows_list} | jq -r .name | grep -E "${workflows_keep_keyword[$i]}" >>${keep_keyword_workflows_list}
+            cat "${all_workflows_list}" | jq -r .run_number | grep -E "${workflows_keep_keyword[$i]}" >>${keep_keyword_workflows_list}
         done
         [[ "${out_log}" == "true" ]] && echo -e "${INFO} (2.2.1) List of Workflows runs that meet the criteria:\n$(cat ${keep_keyword_workflows_list})"
 
@@ -319,16 +325,11 @@ get_workflows_list() {
             echo -e "${INFO} (2.3.1) Delete all workflows runs."
         else
             # Remove workflows that meet the retention time
-            today_second=$(date -d "$(date +"%Y%m%d")" +%s)
-            cat ${all_workflows_list} | jq -r '.date' | awk -F'T' '{print $1}' | tr ' ' '\n' >${all_workflows_date_list}
-            cat ${all_workflows_date_list} | while read line; do
-                line_second="$(date -d "${line//-/}" +%s)"
-                day_diff="$(((${today_second} - ${line_second}) / 86400))"
-                [[ "${day_diff}" -lt "${workflows_keep_day}" ]] && {
-                    grep "${line}T" ${all_workflows_list} >>${keep_workflows_list}
-                    sed -i "/${line}T/d" ${all_workflows_list}
-                }
-            done
+            a="${workflows_keep_day}"
+            b="1"
+            val=`expr $a + $b`
+            tail -n +${val} ${all_workflows_list} > xin_workflows_list
+            cat xin_workflows_list > ${all_workflows_list}
             echo -e "${INFO} (2.3.2) The keep workflows runs list is generated successfully."
 
             # Remove duplicate lines
